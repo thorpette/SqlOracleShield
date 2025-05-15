@@ -1,0 +1,48 @@
+{
+  "editor.formatOnSave": true,
+  "editor.tabSize": 2,
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": true
+  },
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "eslint.validate": [
+    "javascript",
+    "javascriptreact",
+    "typescript",
+    "typescriptreact"
+  ],
+  "typescript.tsdk": "node_modules/typescript/lib",
+  "typescript.preferences.importModuleSpecifier": "non-relative",
+  "search.exclude": {
+    "**/node_modules": true,
+    "**/dist": true,
+    "**/.git": true
+  },
+  "files.exclude": {
+    "**/.git": true,
+    "**/.DS_Store": true,
+    "**/node_modules": false
+  },
+  "javascript.updateImportsOnFileMove.enabled": "always",
+  "typescript.updateImportsOnFileMove.enabled": "always",
+  "prettier.singleQuote": true,
+  "prettier.trailingComma": "es5",
+  "tailwindCSS.includeLanguages": {
+    "typescript": "javascript",
+    "typescriptreact": "javascript"
+  },
+  "tailwindCSS.experimental.classRegex": [
+    ["cva\\(([^)]*)\\)", "[\"'`]([^\"'`]*).*?[\"'`]"],
+    ["cn\\(([^)]*)\\)", "[\"'`]([^\"'`]*).*?[\"'`]"]
+  ],
+  "cSpell.words": [
+    "lucide",
+    "Tablas",
+    "Configuración",
+    "ofuscación",
+    "migración",
+    "conexión",
+    "postgresql",
+    "mongodb"
+  ]
+}
