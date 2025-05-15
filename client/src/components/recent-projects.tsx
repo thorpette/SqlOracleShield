@@ -4,14 +4,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useProjectContext } from "@/context/project-context";
 import { Project } from "@shared/schema";
+import { ProjectSummary } from "@/lib/types";
 import { formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
 import { Check } from "lucide-react";
 
 export function RecentProjects() {
   const [_, navigate] = useLocation();
-  const { recentProjects, currentProject, setCurrentProject, isLoading } = useProjectContext();
-  const [displayProjects, setDisplayProjects] = useState<Project[]>([]);
+  const { recentProjects, currentProject, setCurrentProject, fetchProject, isLoading } = useProjectContext();
+  const [displayProjects, setDisplayProjects] = useState<Array<ProjectSummary>>([]);
 
   useEffect(() => {
     if (recentProjects.length > 0) {
@@ -20,12 +21,16 @@ export function RecentProjects() {
     }
   }, [recentProjects]);
 
-  const handleSelectProject = (project: Project) => {
-    setCurrentProject(project);
+  const handleSelectProject = async (projectSummary: ProjectSummary) => {
+    // Obtener el proyecto completo para seleccionarlo
+    const fullProject = await fetchProject(projectSummary.id);
+    if (fullProject) {
+      setCurrentProject(fullProject);
+    }
   };
 
-  const formatDate = (date: Date) => {
-    return formatDistanceToNow(new Date(date), {
+  const formatDate = (dateStr: string) => {
+    return formatDistanceToNow(new Date(dateStr), {
       addSuffix: true,
       locale: es,
     });
@@ -64,7 +69,7 @@ export function RecentProjects() {
                         {project.name}
                       </p>
                       <p className="mt-1 text-xs text-gray-500">
-                        Actualizado {formatDate(project.createdAt)}
+                        Actualizado {formatDate(project.lastActivity)}
                       </p>
                     </div>
                     <div className="ml-4 flex-shrink-0">
@@ -82,7 +87,7 @@ export function RecentProjects() {
                         {project.dbSourceType || "Sin conexión"}
                       </span>
                       <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">
-                        {project.schema ? `${Object.keys(project.schema.tables).length} tablas` : "0 tablas"}
+                        {project.state}
                       </span>
                     </div>
                   </div>
