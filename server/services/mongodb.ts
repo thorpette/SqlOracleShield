@@ -1,6 +1,13 @@
-import { MongoClient } from "mongodb";
+import { MongoClient, Db } from 'mongodb';
+import { log } from '../vite';
 
-// Test MongoDB connection
+// Interfaz para la configuración de MongoDB
+export interface MongoDBConfig {
+  uri: string;
+  dbName: string;
+}
+
+// Función para probar la conexión a MongoDB
 export async function testMongoDBConnection(
   uri: string,
   dbName: string
@@ -8,40 +15,58 @@ export async function testMongoDBConnection(
   let client: MongoClient | null = null;
   
   try {
-    client = new MongoClient(uri, {
-      serverSelectionTimeoutMS: 5000
-    });
+    log(`Probando conexión a MongoDB: ${uri}, DB: ${dbName}`, 'mongodb-service');
     
+    // Crear una nueva instancia del cliente de MongoDB
+    client = new MongoClient(uri);
+    
+    // Conectar al servidor
     await client.connect();
     
-    // Test connection by getting the database info
+    // Intentar acceder a la base de datos
     const db = client.db(dbName);
-    await db.command({ ping: 1 });
+    
+    // Verificar que podemos acceder a las colecciones
+    const collections = await db.listCollections().toArray();
+    
+    log(`Conexión exitosa. Colecciones disponibles: ${collections.length}`, 'mongodb-service');
     
     return { success: true };
   } catch (error) {
-    console.error("Error connecting to MongoDB:", error);
-    return {
+    const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
+    log(`Error al conectar a MongoDB: ${errorMessage}`, 'mongodb-service');
+    
+    return { 
       success: false,
-      error: error instanceof Error ? error.message : "Error desconocido"
+      error: `Error al conectar a MongoDB: ${errorMessage}`
     };
   } finally {
+    // Cerrar la conexión si se estableció
     if (client) {
       await client.close();
     }
   }
 }
 
-// Get MongoDB client
+// Función para obtener un cliente MongoDB
 export async function getMongoDBClient(
-  uri: string
-): Promise<MongoClient> {
+  uri: string,
+  dbName: string
+): Promise<{ client: MongoClient; db: Db }> {
   try {
+    // Crear una nueva instancia del cliente de MongoDB
     const client = new MongoClient(uri);
+    
+    // Conectar al servidor
     await client.connect();
-    return client;
+    
+    // Acceder a la base de datos
+    const db = client.db(dbName);
+    
+    return { client, db };
   } catch (error) {
-    console.error("Error connecting to MongoDB:", error);
+    const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
+    log(`Error al obtener cliente MongoDB: ${errorMessage}`, 'mongodb-service');
     throw error;
   }
 }
