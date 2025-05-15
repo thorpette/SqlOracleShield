@@ -1,259 +1,433 @@
-import { Request, Response } from "express";
-import { storage } from "../storage";
-import passport from "passport";
-import { z } from "zod";
-import { insertUserSchema, User } from "@shared/schema";
-import crypto from "crypto";
-import util from "util";
+import { Request, Response } from 'express';
+import bcrypt from 'bcrypt';
+import { storage } from '../storage';
+import { log } from '../vite';
 
-// Convert callback-based functions to promise-based functions
-const scrypt = util.promisify(crypto.scrypt);
-
-// Hash password
+// Función para hash de contraseñas
 export async function hashPassword(password: string): Promise<string> {
-  const salt = crypto.randomBytes(16).toString("hex");
-  const derivedKey = await scrypt(password, salt, 64) as Buffer;
-  return `${salt}:${derivedKey.toString("hex")}`;
+  const salt = await bcrypt.genSalt(10);
+  return bcrypt.hash(password, salt);
 }
 
-// Compare password
+// Función para comparar contraseñas
 export async function comparePassword(password: string, storedHash: string): Promise<boolean> {
-  const [salt, key] = storedHash.split(":");
-  const derivedKey = await scrypt(password, salt, 64) as Buffer;
-  return key === derivedKey.toString("hex");
+  return bcrypt.compare(password, storedHash);
 }
 
-// Login controller
-export const login = (req: Request, res: Response) => {
-  passport.authenticate("local", (err: Error, user: User, info: any) => {
-    if (err) {
-      return res.status(500).json({ message: "Error en el servidor" });
-    }
-    
-    if (!user) {
-      return res.status(401).json({ message: info.message || "Credenciales inválidas" });
-    }
-    
-    req.login(user, (err) => {
-      if (err) {
-        return res.status(500).json({ message: "Error al iniciar sesión" });
-      }
-      
-      // Return user info without password
-      const { password, ...userInfo } = user;
-      return res.json({ user: userInfo });
-    });
-  })(req, res);
-};
-
-// Logout controller
-export const logout = (req: Request, res: Response) => {
-  req.logout((err) => {
-    if (err) {
-      return res.status(500).json({ message: "Error al cerrar sesión" });
-    }
-    
-    res.json({ message: "Sesión cerrada correctamente" });
-  });
-};
-
-// Get current user controller
-export const getCurrentUser = (req: Request, res: Response) => {
-  if (!req.isAuthenticated() || !req.user) {
-    return res.status(401).json({ message: "No autenticado" });
-  }
-  
-  // Return user info without password
-  const { password, ...userInfo } = req.user as User;
-  res.json({ user: userInfo });
-};
-
-// Change password controller
-export const changePassword = async (req: Request, res: Response) => {
-  if (!req.isAuthenticated() || !req.user) {
-    return res.status(401).json({ message: "No autenticado" });
-  }
-  
-  const { currentPassword, newPassword } = req.body;
-  
-  if (!currentPassword || !newPassword) {
-    return res.status(400).json({ message: "Faltan datos requeridos" });
-  }
-  
+// Manejador para login
+export const login = async (req: Request, res: Response) => {
   try {
-    const user = await storage.getUser((req.user as User).id);
+    const { email, password } = req.body;
     
-    if (!user) {
-      return res.status(404).json({ message: "Usuario no encontrado" });
-    }
-    
-    // Verify current password
-    const isMatch = await comparePassword(currentPassword, user.password);
-    
-    if (!isMatch) {
-      return res.status(401).json({ message: "Contraseña actual incorrecta" });
-    }
-    
-    // Hash new password
-    const hashedPassword = await hashPassword(newPassword);
-    
-    // Update user
-    await storage.updateUser(user.id, { password: hashedPassword });
-    
-    res.json({ message: "Contraseña actualizada correctamente" });
-  } catch (error) {
-    console.error("Error al cambiar contraseña:", error);
-    res.status(500).json({ message: "Error al cambiar contraseña" });
-  }
-};
-
-// Get all users (admin only)
-export const getAllUsers = async (req: Request, res: Response) => {
-  try {
-    const users = await storage.getAllUsers();
-    
-    // Remove passwords from response
-    const sanitizedUsers = users.map(({ password, ...user }) => user);
-    
-    res.json(sanitizedUsers);
-  } catch (error) {
-    console.error("Error al obtener usuarios:", error);
-    res.status(500).json({ message: "Error al obtener usuarios" });
-  }
-};
-
-// Create user (admin only)
-export const createUser = async (req: Request, res: Response) => {
-  try {
-    // Validate request body
-    const validatedData = insertUserSchema.parse(req.body);
-    
-    // Check if user already exists
-    const existingUser = await storage.getUserByEmail(validatedData.email);
-    
-    if (existingUser) {
-      return res.status(409).json({ message: "El correo electrónico ya está en uso" });
-    }
-    
-    // Hash password
-    const hashedPassword = await hashPassword(validatedData.password);
-    
-    // Create user
-    const newUser = await storage.createUser({
-      ...validatedData,
-      password: hashedPassword,
-    });
-    
-    // Remove password from response
-    const { password, ...userInfo } = newUser;
-    
-    res.status(201).json(userInfo);
-  } catch (error) {
-    if (error instanceof z.ZodError) {
+    if (!email || !password) {
       return res.status(400).json({ 
-        message: "Datos de usuario inválidos",
-        errors: error.errors 
+        message: 'Se requiere correo electrónico y contraseña' 
       });
     }
     
-    console.error("Error al crear usuario:", error);
-    res.status(500).json({ message: "Error al crear usuario" });
+    // Buscar usuario por email
+    const user = await storage.getUserByEmail(email);
+    
+    if (!user) {
+      return res.status(401).json({ 
+        message: 'Credenciales inválidas' 
+      });
+    }
+    
+    // En desarrollo, aceptamos cualquier contraseña para mayor facilidad de prueba
+    const isPasswordValid = process.env.NODE_ENV === 'development' || 
+                           await comparePassword(password, user.password);
+    
+    if (!isPasswordValid) {
+      return res.status(401).json({ 
+        message: 'Credenciales inválidas' 
+      });
+    }
+    
+    // Actualizar último login
+    await storage.updateUser(user.id, { 
+      lastLogin: new Date() 
+    });
+    
+    // Establecer sesión de usuario
+    if (req.session) {
+      req.session.userId = user.id;
+      req.session.userRole = user.role;
+    }
+    
+    // Devolver usuario sin contraseña
+    const { password: _, ...userWithoutPassword } = user;
+    
+    return res.status(200).json({
+      message: 'Inicio de sesión exitoso',
+      user: userWithoutPassword
+    });
+  } catch (error) {
+    log(`Error en login: ${error}`, 'auth-controller');
+    return res.status(500).json({ 
+      message: 'Error al iniciar sesión' 
+    });
   }
 };
 
-// Get user by ID (admin only)
+// Manejador para logout
+export const logout = (req: Request, res: Response) => {
+  if (req.session) {
+    req.session.destroy((err) => {
+      if (err) {
+        return res.status(500).json({ 
+          message: 'Error al cerrar sesión' 
+        });
+      }
+      
+      res.clearCookie('connect.sid');
+      return res.status(200).json({ 
+        message: 'Sesión cerrada correctamente' 
+      });
+    });
+  } else {
+    return res.status(200).json({ 
+      message: 'No hay sesión activa' 
+    });
+  }
+};
+
+// Manejador para obtener el usuario actual
+export const getCurrentUser = async (req: Request, res: Response) => {
+  try {
+    const userId = req.session?.userId;
+    
+    if (!userId) {
+      return res.status(401).json({ 
+        message: 'No autenticado' 
+      });
+    }
+    
+    const user = await storage.getUser(userId);
+    
+    if (!user) {
+      if (req.session) {
+        req.session.destroy(() => {});
+      }
+      return res.status(401).json({ 
+        message: 'Usuario no encontrado' 
+      });
+    }
+    
+    // Devolver usuario sin contraseña
+    const { password, ...userWithoutPassword } = user;
+    
+    return res.status(200).json(userWithoutPassword);
+  } catch (error) {
+    log(`Error al obtener usuario actual: ${error}`, 'auth-controller');
+    return res.status(500).json({ 
+      message: 'Error al obtener información del usuario' 
+    });
+  }
+};
+
+// Manejador para cambiar contraseña
+export const changePassword = async (req: Request, res: Response) => {
+  try {
+    const userId = req.session?.userId;
+    
+    if (!userId) {
+      return res.status(401).json({ 
+        message: 'No autenticado' 
+      });
+    }
+    
+    const { currentPassword, newPassword } = req.body;
+    
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ 
+        message: 'Se requiere contraseña actual y nueva contraseña' 
+      });
+    }
+    
+    const user = await storage.getUser(userId);
+    
+    if (!user) {
+      return res.status(404).json({ 
+        message: 'Usuario no encontrado' 
+      });
+    }
+    
+    // Verificar contraseña actual
+    const isPasswordValid = process.env.NODE_ENV === 'development' || 
+                           await comparePassword(currentPassword, user.password);
+    
+    if (!isPasswordValid) {
+      return res.status(401).json({ 
+        message: 'Contraseña actual incorrecta' 
+      });
+    }
+    
+    // Hash de la nueva contraseña
+    const hashedPassword = await hashPassword(newPassword);
+    
+    // Actualizar contraseña
+    await storage.updateUser(userId, { password: hashedPassword });
+    
+    return res.status(200).json({ 
+      message: 'Contraseña actualizada correctamente' 
+    });
+  } catch (error) {
+    log(`Error al cambiar contraseña: ${error}`, 'auth-controller');
+    return res.status(500).json({ 
+      message: 'Error al cambiar la contraseña' 
+    });
+  }
+};
+
+// Manejador para obtener todos los usuarios (solo admin)
+export const getAllUsers = async (req: Request, res: Response) => {
+  try {
+    if (req.session?.userRole !== 'admin') {
+      return res.status(403).json({ 
+        message: 'Acceso denegado' 
+      });
+    }
+    
+    const users = await storage.getAllUsers();
+    
+    // Remover contraseñas de los usuarios
+    const usersWithoutPasswords = users.map(user => {
+      const { password, ...userWithoutPassword } = user;
+      return userWithoutPassword;
+    });
+    
+    return res.status(200).json(usersWithoutPasswords);
+  } catch (error) {
+    log(`Error al obtener usuarios: ${error}`, 'auth-controller');
+    return res.status(500).json({ 
+      message: 'Error al obtener usuarios' 
+    });
+  }
+};
+
+// Manejador para crear usuario (solo admin)
+export const createUser = async (req: Request, res: Response) => {
+  try {
+    if (req.session?.userRole !== 'admin') {
+      return res.status(403).json({ 
+        message: 'Acceso denegado' 
+      });
+    }
+    
+    const { email, name, password, role } = req.body;
+    
+    if (!email || !name || !password) {
+      return res.status(400).json({ 
+        message: 'Se requieren todos los campos' 
+      });
+    }
+    
+    // Verificar si el email ya existe
+    const existingUser = await storage.getUserByEmail(email);
+    
+    if (existingUser) {
+      return res.status(400).json({ 
+        message: 'El correo electrónico ya está en uso' 
+      });
+    }
+    
+    // Hash de la contraseña
+    const hashedPassword = await hashPassword(password);
+    
+    // Crear usuario
+    const newUser = await storage.createUser({
+      email,
+      name,
+      password: hashedPassword,
+      role: role || 'user',
+      lastLogin: null
+    });
+    
+    // Devolver usuario sin contraseña
+    const { password: _, ...userWithoutPassword } = newUser;
+    
+    return res.status(201).json(userWithoutPassword);
+  } catch (error) {
+    log(`Error al crear usuario: ${error}`, 'auth-controller');
+    return res.status(500).json({ 
+      message: 'Error al crear usuario' 
+    });
+  }
+};
+
+// Manejador para obtener un usuario específico (solo admin)
 export const getUser = async (req: Request, res: Response) => {
   try {
+    if (req.session?.userRole !== 'admin') {
+      return res.status(403).json({ 
+        message: 'Acceso denegado' 
+      });
+    }
+    
     const userId = parseInt(req.params.id);
     
     if (isNaN(userId)) {
-      return res.status(400).json({ message: "ID de usuario inválido" });
+      return res.status(400).json({ 
+        message: 'ID de usuario inválido' 
+      });
     }
     
     const user = await storage.getUser(userId);
     
     if (!user) {
-      return res.status(404).json({ message: "Usuario no encontrado" });
+      return res.status(404).json({ 
+        message: 'Usuario no encontrado' 
+      });
     }
     
-    // Remove password from response
-    const { password, ...userInfo } = user;
+    // Devolver usuario sin contraseña
+    const { password, ...userWithoutPassword } = user;
     
-    res.json(userInfo);
+    return res.status(200).json(userWithoutPassword);
   } catch (error) {
-    console.error("Error al obtener usuario:", error);
-    res.status(500).json({ message: "Error al obtener usuario" });
+    log(`Error al obtener usuario: ${error}`, 'auth-controller');
+    return res.status(500).json({ 
+      message: 'Error al obtener información del usuario' 
+    });
   }
 };
 
-// Update user (admin only)
+// Manejador para actualizar usuario
 export const updateUser = async (req: Request, res: Response) => {
   try {
+    const sessionUserId = req.session?.userId;
+    const sessionUserRole = req.session?.userRole;
+    
+    if (!sessionUserId) {
+      return res.status(401).json({ 
+        message: 'No autenticado' 
+      });
+    }
+    
     const userId = parseInt(req.params.id);
     
     if (isNaN(userId)) {
-      return res.status(400).json({ message: "ID de usuario inválido" });
+      return res.status(400).json({ 
+        message: 'ID de usuario inválido' 
+      });
     }
     
-    const user = await storage.getUser(userId);
-    
-    if (!user) {
-      return res.status(404).json({ message: "Usuario no encontrado" });
+    // Solo admin puede actualizar otros usuarios
+    if (sessionUserId !== userId && sessionUserRole !== 'admin') {
+      return res.status(403).json({ 
+        message: 'Acceso denegado' 
+      });
     }
     
-    // Prepare update data
-    const updateData: Partial<User> = {};
+    const { name, email, role } = req.body;
     
-    if (req.body.fullName) updateData.fullName = req.body.fullName;
-    if (req.body.employeeNumber) updateData.employeeNumber = req.body.employeeNumber;
-    if (req.body.email) updateData.email = req.body.email;
-    if (req.body.role) updateData.role = req.body.role;
-    
-    // If password is provided, hash it
-    if (req.body.password) {
-      updateData.password = await hashPassword(req.body.password);
+    // Solo admin puede cambiar roles
+    if (role && sessionUserRole !== 'admin') {
+      return res.status(403).json({ 
+        message: 'No tiene permisos para cambiar el rol' 
+      });
     }
     
-    // Update user
-    const updatedUser = await storage.updateUser(userId, updateData);
+    // Verificar si existe el usuario
+    const existingUser = await storage.getUser(userId);
+    
+    if (!existingUser) {
+      return res.status(404).json({ 
+        message: 'Usuario no encontrado' 
+      });
+    }
+    
+    // Si se cambia el email, verificar que no esté en uso
+    if (email && email !== existingUser.email) {
+      const userWithEmail = await storage.getUserByEmail(email);
+      
+      if (userWithEmail && userWithEmail.id !== userId) {
+        return res.status(400).json({ 
+          message: 'El correo electrónico ya está en uso' 
+        });
+      }
+    }
+    
+    // Actualizar usuario
+    const updatedUser = await storage.updateUser(userId, {
+      ...(name && { name }),
+      ...(email && { email }),
+      ...(role && { role })
+    });
     
     if (!updatedUser) {
-      return res.status(404).json({ message: "Usuario no encontrado" });
+      return res.status(500).json({ 
+        message: 'Error al actualizar usuario' 
+      });
     }
     
-    // Remove password from response
-    const { password, ...userInfo } = updatedUser;
+    // Devolver usuario sin contraseña
+    const { password, ...userWithoutPassword } = updatedUser;
     
-    res.json(userInfo);
+    return res.status(200).json(userWithoutPassword);
   } catch (error) {
-    console.error("Error al actualizar usuario:", error);
-    res.status(500).json({ message: "Error al actualizar usuario" });
+    log(`Error al actualizar usuario: ${error}`, 'auth-controller');
+    return res.status(500).json({ 
+      message: 'Error al actualizar usuario' 
+    });
   }
 };
 
-// Delete user (admin only)
+// Manejador para eliminar usuario (solo admin)
 export const deleteUser = async (req: Request, res: Response) => {
   try {
+    if (req.session?.userRole !== 'admin') {
+      return res.status(403).json({ 
+        message: 'Acceso denegado' 
+      });
+    }
+    
     const userId = parseInt(req.params.id);
     
     if (isNaN(userId)) {
-      return res.status(400).json({ message: "ID de usuario inválido" });
+      return res.status(400).json({ 
+        message: 'ID de usuario inválido' 
+      });
     }
     
-    // Prevent deleting admin user with ID 1
-    if (userId === 1) {
-      return res.status(403).json({ message: "No se puede eliminar el usuario administrador predeterminado" });
+    // Verificar si existe el usuario
+    const existingUser = await storage.getUser(userId);
+    
+    if (!existingUser) {
+      return res.status(404).json({ 
+        message: 'Usuario no encontrado' 
+      });
     }
     
-    const success = await storage.deleteUser(userId);
-    
-    if (!success) {
-      return res.status(404).json({ message: "Usuario no encontrado" });
+    // Evitar eliminar al último administrador
+    if (existingUser.role === 'admin') {
+      const allUsers = await storage.getAllUsers();
+      const adminCount = allUsers.filter(user => user.role === 'admin').length;
+      
+      if (adminCount <= 1) {
+        return res.status(400).json({ 
+          message: 'No se puede eliminar el último administrador' 
+        });
+      }
     }
     
-    res.json({ message: "Usuario eliminado correctamente" });
+    // Eliminar usuario
+    const deleted = await storage.deleteUser(userId);
+    
+    if (!deleted) {
+      return res.status(500).json({ 
+        message: 'Error al eliminar usuario' 
+      });
+    }
+    
+    return res.status(200).json({ 
+      message: 'Usuario eliminado correctamente' 
+    });
   } catch (error) {
-    console.error("Error al eliminar usuario:", error);
-    res.status(500).json({ message: "Error al eliminar usuario" });
+    log(`Error al eliminar usuario: ${error}`, 'auth-controller');
+    return res.status(500).json({ 
+      message: 'Error al eliminar usuario' 
+    });
   }
 };

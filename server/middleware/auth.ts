@@ -1,26 +1,26 @@
-import { Request, Response, NextFunction } from "express";
-import { User } from "@shared/schema";
+import { Request, Response, NextFunction } from 'express';
 
-// Middleware to check if user is authenticated
+// Middleware para verificar autenticación
 export const authenticateJWT = (req: Request, res: Response, next: NextFunction) => {
-  if (req.isAuthenticated()) {
-    return next();
+  // Verificar si hay una sesión de usuario
+  if (!req.session?.userId) {
+    return res.status(401).json({ message: 'No autenticado' });
   }
   
-  return res.status(401).json({ message: "No autenticado" });
+  next();
 };
 
-// Middleware to check if user is admin
+// Middleware para verificar rol de administrador
 export const isAdmin = (req: Request, res: Response, next: NextFunction) => {
-  if (!req.isAuthenticated() || !req.user) {
-    return res.status(401).json({ message: "No autenticado" });
+  // Verificar si hay una sesión de usuario
+  if (!req.session?.userId) {
+    return res.status(401).json({ message: 'No autenticado' });
   }
   
-  const user = req.user as User;
-  
-  if (user.role !== "admin") {
-    return res.status(403).json({ message: "No autorizado. Se requiere rol de administrador" });
+  // Verificar si el usuario es administrador
+  if (req.session?.userRole !== 'admin') {
+    return res.status(403).json({ message: 'Acceso denegado' });
   }
   
-  return next();
+  next();
 };

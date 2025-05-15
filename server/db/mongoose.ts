@@ -17,9 +17,8 @@ export async function connectToMongoDB(): Promise<mongoose.Connection> {
     if (mongodbUri === DEFAULT_MONGODB_URI) {
       log('Usando MongoDB en memoria para desarrollo', 'mongoose');
       
-      // Podemos usar mongoose en modo "mock" para desarrollo
-      mongoose.connection.db = {} as any;
-      mongoose.connection.collections = {} as any;
+      // En desarrollo, simplemente continuamos sin intentar acceder a propiedades de MongoDB
+      // No modificamos mongoose.connection directamente
       
       // Fingimos que estamos conectados para que la aplicación funcione
       log('Conexión a MongoDB en memoria establecida correctamente', 'mongoose');
@@ -48,10 +47,8 @@ export async function connectToMongoDB(): Promise<mongoose.Connection> {
   } catch (error) {
     log(`Error al conectar a MongoDB: ${error}`, 'mongoose');
     
-    // En caso de error, creamos una conexión simulada para desarrollo
+    // En caso de error, simplemente continuamos en modo desarrollo
     log('Usando MongoDB simulado debido a un error de conexión', 'mongoose');
-    mongoose.connection.db = {} as any;
-    mongoose.connection.collections = {} as any;
     
     return mongoose.connection;
   }

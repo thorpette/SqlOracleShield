@@ -154,20 +154,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Create default admin user if it doesn't exist
   try {
-    const adminUser = await storage.getUserByEmail("NTT");
+    const adminUser = await storage.getUserByEmail("admin@ejemplo.com");
     if (!adminUser) {
-      const hashedPassword = await hashPassword("NTT");
+      const hashedPassword = await hashPassword("admin123");
       await storage.createUser({
-        fullName: "Admin NTT",
-        employeeNumber: "A001",
-        email: "NTT",
+        name: "Administrador",
+        email: "admin@ejemplo.com",
         password: hashedPassword,
         role: "admin",
+        lastLogin: null
       });
-      console.log("Default admin user created");
+      console.log("Usuario administrador por defecto creado");
+    }
+    
+    // También crear un usuario regular
+    const regularUser = await storage.getUserByEmail("usuario@ejemplo.com");
+    if (!regularUser) {
+      const hashedPassword = await hashPassword("usuario123");
+      await storage.createUser({
+        name: "Usuario",
+        email: "usuario@ejemplo.com",
+        password: hashedPassword,
+        role: "user",
+        lastLogin: null
+      });
+      console.log("Usuario regular por defecto creado");
     }
   } catch (error) {
-    console.error("Error creating default admin user:", error);
+    console.error("Error creando usuarios por defecto:", error);
   }
 
   return httpServer;
