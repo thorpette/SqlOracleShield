@@ -1,49 +1,49 @@
 import mongoose from 'mongoose';
 import { log } from '../vite';
 
-// Connection URL
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/sqlprocessor';
+// URL predeterminada de MongoDB (local)
+const DEFAULT_MONGODB_URI = 'mongodb://127.0.0.1:27017/sql-processor';
 
-// Connect to MongoDB
+// Función para conectar a MongoDB
 export async function connectToMongoDB(): Promise<mongoose.Connection> {
   try {
+    // Utilizar la URL de MongoDB de las variables de entorno o la URL predeterminada
+    const mongodbUri = process.env.MONGODB_URI || DEFAULT_MONGODB_URI;
+    
     log('Conectando a MongoDB...', 'mongoose');
-    await mongoose.connect(MONGODB_URI);
-    log('Conexión a MongoDB establecida con éxito', 'mongoose');
-    return mongoose.connection;
+    
+    // Configurar opciones de conexión
+    await mongoose.connect(mongodbUri, {
+      // Las opciones se definen automáticamente en mongoose 7+
+    });
+    
+    log('Conexión a MongoDB establecida correctamente', 'mongoose');
+    
+    const db = mongoose.connection;
+    
+    // Manejar eventos de conexión
+    db.on('error', (error) => {
+      log(`Error en la conexión a MongoDB: ${error}`, 'mongoose');
+    });
+    
+    db.on('disconnected', () => {
+      log('Desconectado de MongoDB', 'mongoose');
+    });
+    
+    return db;
   } catch (error) {
-    log(`Error conectando a MongoDB: ${error}`, 'mongoose');
+    log(`Error al conectar a MongoDB: ${error}`, 'mongoose');
     throw error;
   }
 }
 
-// Disconnect from MongoDB
+// Función para desconectar de MongoDB
 export async function disconnectFromMongoDB(): Promise<void> {
   try {
     await mongoose.disconnect();
-    log('Desconexión de MongoDB exitosa', 'mongoose');
+    log('Desconectado de MongoDB', 'mongoose');
   } catch (error) {
     log(`Error al desconectar de MongoDB: ${error}`, 'mongoose');
     throw error;
   }
 }
-
-// Handle MongoDB connection events
-mongoose.connection.on('connected', () => {
-  log('MongoDB conectado', 'mongoose');
-});
-
-mongoose.connection.on('error', (err) => {
-  log(`Error de conexión a MongoDB: ${err}`, 'mongoose');
-});
-
-mongoose.connection.on('disconnected', () => {
-  log('MongoDB desconectado', 'mongoose');
-});
-
-// Handle process termination
-process.on('SIGINT', async () => {
-  await mongoose.disconnect();
-  log('Aplicación terminada, MongoDB desconectado', 'mongoose');
-  process.exit(0);
-});
