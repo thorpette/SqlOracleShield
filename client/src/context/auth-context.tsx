@@ -1,8 +1,19 @@
-import { createContext, useContext, useEffect, useState } from "react";
-import { apiRequest } from "@/lib/queryClient";
-import { useToast } from "@/hooks/use-toast";
-import type { User } from "@shared/schema";
-import type { UserCredentials, AuthResponse } from "@/lib/types";
+import React, { createContext, useState, useCallback, useContext, useEffect } from 'react';
+import { useToast } from '@/hooks/use-toast';
+import { queryClient } from '@/lib/queryClient';
+import { User } from '@shared/schema';
+
+// Tipos para el contexto
+interface UserCredentials {
+  email: string;
+  password: string;
+}
+
+interface AuthResponse {
+  user: User;
+  success: boolean;
+  message?: string;
+}
 
 interface AuthContextType {
   user: User | null;
@@ -12,48 +23,79 @@ interface AuthContextType {
   logout: () => void;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+// Valor predeterminado para el contexto
+const defaultAuthContext: AuthContextType = {
+  user: null,
+  isAuthenticated: false,
+  isLoading: true,
+  login: async () => false,
+  logout: () => {},
+};
 
+// Crear el contexto
+const AuthContext = createContext<AuthContextType>(defaultAuthContext);
+
+// Proveedor del contexto
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
 
+  // Efecto para cargar el usuario actual
   useEffect(() => {
-    // Check if user is already logged in
-    const checkAuth = async () => {
+    const getCurrentUser = async () => {
       try {
-        const res = await apiRequest("GET", "/api/auth/me");
+        const res = await fetch('/api/auth/me');
         if (res.ok) {
           const data = await res.json();
-          setUser(data.user);
+          setUser(data);
         }
       } catch (error) {
-        // Handle silently - user is not logged in
+        console.error('Error al obtener el usuario actual:', error);
       } finally {
         setIsLoading(false);
       }
     };
 
-    checkAuth();
+    getCurrentUser();
   }, []);
 
+  // Función para iniciar sesión
   const login = async (credentials: UserCredentials): Promise<boolean> => {
     setIsLoading(true);
     try {
-      const res = await apiRequest("POST", "/api/auth/login", credentials);
-      const data: AuthResponse = await res.json();
-      setUser(data.user as User);
-      toast({
-        title: "Inicio de sesión exitoso",
-        description: `Bienvenido, ${data.user.fullName}`,
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(credentials),
       });
-      return true;
+
+      const data: AuthResponse = await res.json();
+
+      if (res.ok && data.success) {
+        setUser(data.user);
+        queryClient.invalidateQueries({ queryKey: ['currentUser'] });
+        toast({
+          title: '¡Bienvenido!',
+          description: `Has iniciado sesión como ${data.user.name}`,
+        });
+        return true;
+      } else {
+        toast({
+          title: 'Error de inicio de sesión',
+          description: data.message || 'Credenciales incorrectas',
+          variant: 'destructive',
+        });
+        return false;
+      }
     } catch (error) {
+      console.error('Error en el inicio de sesión:', error);
       toast({
-        title: "Error de inicio de sesión",
-        description: error instanceof Error ? error.message : "Error desconocido",
-        variant: "destructive",
+        title: 'Error',
+        description: 'Ocurrió un error al intentar iniciar sesión',
+        variant: 'destructive',
       });
       return false;
     } finally {
@@ -61,40 +103,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const logout = async () => {
+  // Función para cerrar sesión
+  const logout = useCallback(async () => {
     try {
-      await apiRequest("POST", "/api/auth/logout");
+      await fetch('/api/auth/logout', { method: 'POST' });
       setUser(null);
-      // Redirect to login after logout
-      window.location.href = "/login";
-    } catch (error) {
+      queryClient.clear();
       toast({
-        title: "Error al cerrar sesión",
-        description: error instanceof Error ? error.message : "Error desconocido",
-        variant: "destructive",
+        title: 'Sesión cerrada',
+        description: 'Has cerrado sesión correctamente',
+      });
+    } catch (error) {
+      console.error('Error al cerrar sesión:', error);
+      toast({
+        title: 'Error',
+        description: 'Ocurrió un error al intentar cerrar sesión',
+        variant: 'destructive',
       });
     }
+  }, [toast]);
+
+  const value = {
+    user,
+    isAuthenticated: !!user,
+    isLoading,
+    login,
+    logout,
   };
 
-  return (
-    <AuthContext.Provider
-      value={{
-        user,
-        isAuthenticated: !!user,
-        isLoading,
-        login,
-        logout,
-      }}
-    >
-      {children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
 export function useAuthContext() {
   const context = useContext(AuthContext);
   if (context === undefined) {
-    throw new Error("useAuthContext must be used within an AuthProvider");
+    throw new Error('useAuthContext debe usarse dentro de un AuthProvider');
   }
   return context;
 }

@@ -9,8 +9,8 @@ import { ThemeProvider } from "./context/theme-context";
 
 // Components & Layout
 import NotFound from "@/pages/not-found";
-import Login from "@/components/auth/login-form";
-import Sidebar from "@/components/layout/sidebar";
+import { LoginForm } from "@/components/auth/login-form";
+import { Sidebar } from "@/components/layout/sidebar";
 
 // Pages
 import Home from "@/pages/home";
@@ -41,7 +41,7 @@ function ProtectedRoute({ component: Component, adminOnly = false }:
   }
   
   if (!isAuthenticated) {
-    return <Login />;
+    return <LoginForm />;
   }
   
   if (adminOnly && user?.role !== "admin") {
@@ -66,7 +66,7 @@ function ProtectedRoute({ component: Component, adminOnly = false }:
 function Router() {
   return (
     <Switch>
-      <Route path="/login" component={() => <Login />} />
+      <Route path="/login" component={() => <LoginForm />} />
       <Route path="/" component={() => <ProtectedRoute component={Home} />} />
       <Route path="/conexion" component={() => <ProtectedRoute component={Connection} />} />
       <Route path="/esquemas" component={() => <ProtectedRoute component={Schemas} />} />

@@ -1,247 +1,192 @@
-import { useState } from "react";
-import { useLocation, Link } from "wouter";
-import { useAuth } from "@/hooks/use-auth";
-import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
-import { useIsMobile } from "@/hooks/use-mobile";
-import {
-  Database,
-  BarChart2,
-  ShieldAlert,
-  HardDrive,
-  ArrowLeftRight,
-  Settings,
-  PieChart,
-  FileStack,
-  Home,
-  Users,
-  Layers3,
-  Menu,
-  X,
-  LogOut,
-} from "lucide-react";
+import { FC, useState } from 'react';
+import { Link, useLocation } from 'wouter';
+import { useAuthContext } from '@/context/auth-context';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { apiRequest } from '@/lib/queryClient';
+import { Button } from '@/components/ui/button';
+import { User } from '@shared/schema';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { 
+  Home, 
+  Server, 
+  FileSearch, 
+  BarChart, 
+  ShieldAlert, 
+  Archive, 
+  ArrowLeftRight, 
+  FileSpreadsheet, 
+  Settings, 
+  User as UserIcon, 
+  Menu, 
+  X, 
+  LogOut 
+} from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 
-interface SidebarItemProps {
-  href: string;
+// Tipo para los elementos del menú
+interface MenuItem {
+  label: string;
   icon: React.ReactNode;
-  children: React.ReactNode;
-  isActive?: boolean;
-  onClick?: () => void;
+  href: string;
+  adminOnly?: boolean;
 }
 
-function SidebarItem({
-  href,
-  icon,
-  children,
-  isActive,
-  onClick,
-}: SidebarItemProps) {
-  return (
-    <Link href={href}>
-      <Button
-        variant="ghost"
-        className={cn(
-          "w-full justify-start gap-2 pl-2",
-          isActive
-            ? "bg-gray-100 text-gray-900"
-            : "text-gray-600 hover:text-gray-900"
-        )}
-        onClick={onClick}
-      >
-        {icon}
-        <span>{children}</span>
-      </Button>
-    </Link>
-  );
-}
-
-export default function Sidebar() {
+export function Sidebar() {
   const [location] = useLocation();
-  const { user, logout } = useAuth();
+  const { user, logout } = useAuthContext();
   const isMobile = useIsMobile();
   const [isOpen, setIsOpen] = useState(false);
+  const { toast } = useToast();
 
-  const toggleSidebar = () => {
-    setIsOpen(!isOpen);
-  };
+  // Elementos del menú
+  const menuItems: MenuItem[] = [
+    { label: 'Inicio', icon: <Home className="h-5 w-5" />, href: '/' },
+    { label: 'Conexiones', icon: <Server className="h-5 w-5" />, href: '/conexion' },
+    { label: 'Esquemas', icon: <FileSearch className="h-5 w-5" />, href: '/esquemas' },
+    { label: 'Análisis', icon: <BarChart className="h-5 w-5" />, href: '/analisis' },
+    { label: 'Ofuscación', icon: <ShieldAlert className="h-5 w-5" />, href: '/ofuscacion' },
+    { label: 'Respaldo', icon: <Archive className="h-5 w-5" />, href: '/respaldo' },
+    { label: 'Migración', icon: <ArrowLeftRight className="h-5 w-5" />, href: '/migracion' },
+    { label: 'Monitoreo', icon: <FileSpreadsheet className="h-5 w-5" />, href: '/monitoreo' },
+    { label: 'Usuarios', icon: <UserIcon className="h-5 w-5" />, href: '/admin/usuarios', adminOnly: true },
+    { label: 'Configuración', icon: <Settings className="h-5 w-5" />, href: '/configuracion' },
+  ];
 
-  const closeSidebar = () => {
-    if (isMobile) {
-      setIsOpen(false);
+  // Filtrar elementos del menú basados en el rol del usuario
+  const filteredMenuItems = menuItems.filter(item => {
+    if (item.adminOnly && user?.role !== 'admin') {
+      return false;
     }
+    return true;
+  });
+
+  // Manejador para el cierre de sesión
+  const handleLogout = () => {
+    logout();
   };
 
-  // Menú principal
-  const mainMenu = [
-    {
-      href: "/",
-      icon: <Home size={20} />,
-      label: "Inicio",
-    },
-    {
-      href: "/conexion",
-      icon: <Database size={20} />,
-      label: "Conexión",
-    },
-    {
-      href: "/esquemas",
-      icon: <FileStack size={20} />,
-      label: "Esquemas",
-    },
-    {
-      href: "/analisis",
-      icon: <BarChart2 size={20} />,
-      label: "Análisis",
-    },
-    {
-      href: "/ofuscacion",
-      icon: <ShieldAlert size={20} />,
-      label: "Ofuscación",
-    },
-    {
-      href: "/respaldo",
-      icon: <HardDrive size={20} />,
-      label: "Respaldo",
-    },
-    {
-      href: "/migracion",
-      icon: <ArrowLeftRight size={20} />,
-      label: "Migración",
-    },
-    {
-      href: "/monitoreo",
-      icon: <PieChart size={20} />,
-      label: "Monitoreo",
-    },
-    {
-      href: "/configuracion",
-      icon: <Settings size={20} />,
-      label: "Configuración",
-    },
-  ];
-
-  // Menú administrativo (solo visible para administradores)
-  const adminMenu = [
-    {
-      href: "/admin",
-      icon: <Layers3 size={20} />,
-      label: "Panel Admin",
-    },
-    {
-      href: "/admin/usuarios",
-      icon: <Users size={20} />,
-      label: "Usuarios",
-    },
-    {
-      href: "/admin/proyectos",
-      icon: <FileStack size={20} />,
-      label: "Proyectos",
-    },
-  ];
-
-  return (
-    <>
-      {isMobile && (
-        <div className="fixed top-0 left-0 right-0 z-10 flex items-center justify-between bg-white border-b p-4">
-          <h1 className="text-xl font-bold">SQL Processor</h1>
-          <Button variant="ghost" size="icon" onClick={toggleSidebar}>
-            <Menu size={24} />
-          </Button>
-        </div>
-      )}
-
-      <div
-        className={cn(
-          "bg-white z-40 h-screen",
-          isMobile
-            ? cn(
-                "fixed top-0 left-0 w-64 shadow-lg transition-transform duration-300 transform",
-                isOpen ? "translate-x-0" : "-translate-x-full"
-              )
-            : "w-64 border-r border-gray-200"
-        )}
+  // Función para renderizar cada ítem del menú
+  const renderMenuItem = (item: MenuItem) => {
+    const isActive = location === item.href;
+    
+    return (
+      <Link 
+        key={item.href} 
+        href={item.href}
+        onClick={() => isMobile && setIsOpen(false)}
       >
-        <div className="flex flex-col h-full">
-          <div className="p-4 border-b">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xl font-bold">SQL Processor</h2>
-              {isMobile && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={toggleSidebar}
-                  className="lg:hidden"
-                >
-                  <X size={18} />
-                </Button>
-              )}
-            </div>
-            {user && (
-              <div className="mt-2 text-sm text-gray-600 truncate">
-                {user.fullName}
-              </div>
-            )}
-          </div>
+        <Button
+          variant="ghost"
+          className={`w-full justify-start ${isActive ? 'bg-muted' : ''}`}
+        >
+          {item.icon}
+          <span className="ml-2">{item.label}</span>
+        </Button>
+      </Link>
+    );
+  };
 
-          <div className="flex-1 overflow-y-auto py-2">
-            <nav className="space-y-1 px-2">
-              {mainMenu.map((item) => (
-                <SidebarItem
-                  key={item.href}
-                  href={item.href}
-                  icon={item.icon}
-                  isActive={location === item.href}
-                  onClick={closeSidebar}
-                >
-                  {item.label}
-                </SidebarItem>
-              ))}
-            </nav>
+  // Renderizar el menú según si es móvil o desktop
+  if (isMobile) {
+    return (
+      <>
+        {/* Botón para abrir el menú en móvil */}
+        <Button
+          variant="ghost"
+          size="icon"
+          className="fixed top-4 left-4 z-50"
+          onClick={() => setIsOpen(!isOpen)}
+        >
+          {isOpen ? (
+            <X className="h-6 w-6" />
+          ) : (
+            <Menu className="h-6 w-6" />
+          )}
+        </Button>
 
-            {user?.role === "admin" && (
-              <>
-                <div className="px-4 py-2 mt-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                  Administración
-                </div>
-                <nav className="space-y-1 px-2">
-                  {adminMenu.map((item) => (
-                    <SidebarItem
-                      key={item.href}
-                      href={item.href}
-                      icon={item.icon}
-                      isActive={location === item.href}
-                      onClick={closeSidebar}
-                    >
-                      {item.label}
-                    </SidebarItem>
-                  ))}
-                </nav>
-              </>
-            )}
-          </div>
+        {/* Overlay del menú */}
+        {isOpen && (
+          <div
+            className="fixed inset-0 bg-background/80 backdrop-blur-sm z-40"
+            onClick={() => setIsOpen(false)}
+          />
+        )}
 
-          <div className="p-4 border-t">
-            <Button
-              variant="ghost"
-              className="w-full justify-start gap-2 text-red-600 hover:text-red-700 hover:bg-red-50"
-              onClick={() => {
-                logout();
-                closeSidebar();
-              }}
-            >
-              <LogOut size={20} />
-              <span>Cerrar sesión</span>
+        {/* Menú lateral móvil */}
+        <aside
+          className={`fixed top-0 left-0 z-40 h-screen w-64 transform transition-transform duration-300 ease-in-out ${
+            isOpen ? 'translate-x-0' : '-translate-x-full'
+          } bg-card border-r`}
+        >
+          <div className="p-4 border-b flex items-center justify-between">
+            <h1 className="text-xl font-bold">SQL Processor</h1>
+            <Button variant="ghost" size="icon" onClick={() => setIsOpen(false)}>
+              <X className="h-5 w-5" />
             </Button>
           </div>
-        </div>
-      </div>
 
-      {isMobile && isOpen && (
-        <div
-          className="fixed inset-0 bg-black bg-opacity-50 z-30"
-          onClick={toggleSidebar}
-        />
-      )}
-    </>
+          <ScrollArea className="h-[calc(100vh-4rem)]">
+            <div className="px-2 py-4 space-y-1">
+              {filteredMenuItems.map(renderMenuItem)}
+            </div>
+            
+            <div className="absolute bottom-0 left-0 right-0 p-4 border-t">
+              <div className="flex items-center space-x-2 mb-4">
+                <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-primary-foreground">
+                  {user?.name.charAt(0).toUpperCase()}
+                </div>
+                <div>
+                  <p className="text-sm font-medium">{user?.name}</p>
+                  <p className="text-xs text-muted-foreground">{user?.email}</p>
+                </div>
+              </div>
+              <Button 
+                variant="outline" 
+                className="w-full" 
+                onClick={handleLogout}
+              >
+                <LogOut className="h-4 w-4 mr-2" />
+                Cerrar sesión
+              </Button>
+            </div>
+          </ScrollArea>
+        </aside>
+      </>
+    );
+  }
+
+  // Versión desktop
+  return (
+    <aside className="hidden sm:block w-64 bg-card border-r h-screen overflow-hidden">
+      <div className="p-4 border-b">
+        <h1 className="text-xl font-bold">SQL Processor</h1>
+      </div>
+      
+      <ScrollArea className="h-[calc(100vh-4rem)]">
+        <div className="px-2 py-4 space-y-1">
+          {filteredMenuItems.map(renderMenuItem)}
+        </div>
+        
+        <div className="absolute bottom-0 left-0 right-0 p-4 border-t">
+          <div className="flex items-center space-x-2 mb-4">
+            <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-primary-foreground">
+              {user?.name.charAt(0).toUpperCase()}
+            </div>
+            <div>
+              <p className="text-sm font-medium">{user?.name}</p>
+              <p className="text-xs text-muted-foreground">{user?.email}</p>
+            </div>
+          </div>
+          <Button 
+            variant="outline" 
+            className="w-full" 
+            onClick={handleLogout}
+          >
+            <LogOut className="h-4 w-4 mr-2" />
+            Cerrar sesión
+          </Button>
+        </div>
+      </ScrollArea>
+    </aside>
   );
 }
