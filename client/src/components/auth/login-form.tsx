@@ -1,9 +1,11 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
 import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
+import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Form,
   FormControl,
@@ -12,21 +14,22 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Database } from "lucide-react";
-import { useAuth } from "@/hooks/use-auth";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Loader2 } from "lucide-react";
 
+// Esquema de validación para el formulario de inicio de sesión
 const loginSchema = z.object({
-  email: z.string().email("Ingrese un correo electrónico válido"),
+  email: z.string().email("Ingrese un email válido"),
   password: z.string().min(1, "La contraseña es requerida"),
 });
 
 export default function Login() {
-  const [isLoading, setIsLoading] = useState(false);
+  const [_, navigate] = useLocation();
   const { login } = useAuth();
-  const [_, setLocation] = useLocation();
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
+  // Configurar formulario de inicio de sesión con validación de Zod
   const form = useForm<z.infer<typeof loginSchema>>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
@@ -35,37 +38,41 @@ export default function Login() {
     },
   });
 
-  async function onSubmit(values: z.infer<typeof loginSchema>) {
+  // Manejar el envío del formulario
+  const onSubmit = async (data: z.infer<typeof loginSchema>) => {
     setIsLoading(true);
+    setError(null);
+    
     try {
       const success = await login({
-        email: values.email,
-        password: values.password,
+        email: data.email,
+        password: data.password,
       });
       
       if (success) {
-        setLocation("/");
+        navigate("/"); // Redirigir al inicio después de iniciar sesión exitosamente
+      } else {
+        setError("Credenciales inválidas. Por favor, intente nuevamente.");
       }
+    } catch (err) {
+      setError("Error al iniciar sesión. Por favor, intente más tarde.");
     } finally {
       setIsLoading(false);
     }
-  }
+  };
 
   return (
-    <div className="min-h-screen flex flex-col justify-center py-12 sm:px-6 lg:px-8 bg-gray-50">
-      <div className="sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="flex justify-center">
-          <Database className="h-12 w-12 text-primary-600" />
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-md w-full space-y-8">
+        <div className="text-center">
+          <h2 className="mt-6 text-3xl font-extrabold text-gray-900">
+            SQL Processor
+          </h2>
+          <p className="mt-2 text-sm text-gray-600">
+            Herramienta de procesamiento SQL con capacidades de ofuscación
+          </p>
         </div>
-        <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-          Herramienta de Migración SQL
-        </h2>
-        <p className="mt-2 text-center text-sm text-gray-600">
-          Acceda a su cuenta para continuar
-        </p>
-      </div>
-
-      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
+        
         <Card>
           <CardHeader>
             <CardTitle>Iniciar sesión</CardTitle>
@@ -83,12 +90,18 @@ export default function Login() {
                     <FormItem>
                       <FormLabel>Correo electrónico</FormLabel>
                       <FormControl>
-                        <Input placeholder="correo@ejemplo.com" {...field} />
+                        <Input 
+                          placeholder="correo@ejemplo.com" 
+                          type="email" 
+                          autoComplete="email"
+                          {...field} 
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
+                
                 <FormField
                   control={form.control}
                   name="password"
@@ -96,25 +109,30 @@ export default function Login() {
                     <FormItem>
                       <FormLabel>Contraseña</FormLabel>
                       <FormControl>
-                        <Input type="password" {...field} />
+                        <Input 
+                          placeholder="Contraseña" 
+                          type="password" 
+                          autoComplete="current-password"
+                          {...field} 
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-                <Button
-                  type="submit"
-                  className="w-full"
-                  disabled={isLoading}
-                >
+                
+                {error && (
+                  <div className="text-sm text-red-500 py-2">
+                    {error}
+                  </div>
+                )}
+                
+                <Button type="submit" className="w-full" disabled={isLoading}>
                   {isLoading ? (
-                    <span className="flex items-center">
-                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       Iniciando sesión...
-                    </span>
+                    </>
                   ) : (
                     "Iniciar sesión"
                   )}
@@ -122,6 +140,12 @@ export default function Login() {
               </form>
             </Form>
           </CardContent>
+          <CardFooter className="text-center text-sm text-gray-500 justify-center">
+            <div>
+              <p>Usuario admin: admin@ejemplo.com | Contraseña: admin123</p>
+              <p className="mt-1">Usuario normal: usuario@ejemplo.com | Contraseña: usuario123</p>
+            </div>
+          </CardFooter>
         </Card>
       </div>
     </div>

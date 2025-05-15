@@ -1,137 +1,101 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
-} from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ChartGantt } from "lucide-react";
 import { useProjectContext } from "@/context/project-context";
-import { Skeleton } from "@/components/ui/skeleton";
-
-// Helper function to get status badge color
-const getStatusBadgeStyle = (status: string) => {
-  switch (status) {
-    case "completed":
-      return "bg-green-100 text-green-800";
-    case "in_progress":
-    case "migration":
-    case "extraction":
-      return "bg-yellow-100 text-yellow-800";
-    case "error":
-      return "bg-red-100 text-red-800";
-    default:
-      return "bg-gray-100 text-gray-800";
-  }
-};
-
-// Helper function to translate status to Spanish
-const translateStatus = (status: string) => {
-  const statusMap: Record<string, string> = {
-    "created": "Creado",
-    "extraction": "Extracción",
-    "analysis": "Análisis",
-    "obfuscation": "Ofuscación",
-    "backup": "Respaldo",
-    "migration": "Migración",
-    "completed": "Completado",
-    "error": "Error"
-  };
-  
-  return statusMap[status] || status;
-};
+import { Project } from "@shared/schema";
+import { formatDistanceToNow } from "date-fns";
+import { es } from "date-fns/locale";
+import { Check } from "lucide-react";
 
 export function RecentProjects() {
-  const { recentProjects, fetchProjects, isLoading } = useProjectContext();
   const [_, navigate] = useLocation();
+  const { recentProjects, currentProject, setCurrentProject, isLoading } = useProjectContext();
+  const [displayProjects, setDisplayProjects] = useState<Project[]>([]);
 
   useEffect(() => {
-    fetchProjects();
-  }, [fetchProjects]);
+    if (recentProjects.length > 0) {
+      // Mostrar hasta 5 proyectos recientes
+      setDisplayProjects(recentProjects.slice(0, 5));
+    }
+  }, [recentProjects]);
 
-  const handleOpenProject = (id: number) => {
-    navigate(`/projects/${id}`);
+  const handleSelectProject = (project: Project) => {
+    setCurrentProject(project);
+  };
+
+  const formatDate = (date: Date) => {
+    return formatDistanceToNow(new Date(date), {
+      addSuffix: true,
+      locale: es,
+    });
   };
 
   return (
-    <Card className="w-full">
-      <CardHeader className="border-b border-gray-200">
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle>Proyectos recientes</CardTitle>
+        <Button variant="outline" size="sm" onClick={() => navigate("/admin/proyectos")}>
+          Ver todos
+        </Button>
       </CardHeader>
-      <CardContent className="px-4 py-5">
+      <CardContent>
         {isLoading ? (
+          <div className="py-6 text-center">
+            <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-current border-r-transparent align-[-0.125em] motion-reduce:animate-[spin_1.5s_linear_infinite]"></div>
+            <p className="mt-2 text-sm text-gray-500">Cargando proyectos...</p>
+          </div>
+        ) : displayProjects.length > 0 ? (
           <div className="space-y-4">
-            {[...Array(3)].map((_, i) => (
-              <div key={i} className="flex items-center space-x-4">
-                <Skeleton className="h-12 w-12 rounded-md" />
-                <div className="space-y-2">
-                  <Skeleton className="h-4 w-[250px]" />
-                  <Skeleton className="h-4 w-[200px]" />
+            {displayProjects.map((project) => (
+              <div 
+                key={project.id} 
+                className={`flex items-center justify-between p-3 rounded-lg border ${
+                  currentProject?.id === project.id 
+                    ? 'bg-blue-50 border-blue-200' 
+                    : 'bg-white hover:bg-gray-50 border-gray-200'
+                } cursor-pointer`}
+                onClick={() => handleSelectProject(project)}
+              >
+                <div className="flex-1">
+                  <div className="flex items-center">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-900 truncate">
+                        {project.name}
+                      </p>
+                      <p className="mt-1 text-xs text-gray-500">
+                        Actualizado {formatDate(project.createdAt)}
+                      </p>
+                    </div>
+                    <div className="ml-4 flex-shrink-0">
+                      {currentProject?.id === project.id && (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                          <Check className="mr-1 h-3 w-3" />
+                          Seleccionado
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="mt-2 text-xs">
+                    <div className="flex gap-2 text-gray-500">
+                      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">
+                        {project.dbSourceType || "Sin conexión"}
+                      </span>
+                      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">
+                        {project.schema ? `${Object.keys(project.schema.tables).length} tablas` : "0 tablas"}
+                      </span>
+                    </div>
+                  </div>
                 </div>
               </div>
             ))}
           </div>
-        ) : recentProjects.length === 0 ? (
-          <div className="text-center py-6">
-            <p className="text-sm text-gray-500">No hay proyectos recientes</p>
-          </div>
         ) : (
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Nombre</TableHead>
-                  <TableHead>Base de datos</TableHead>
-                  <TableHead>Estado</TableHead>
-                  <TableHead>Última actividad</TableHead>
-                  <TableHead className="text-right">Acciones</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {recentProjects.map((project) => (
-                  <TableRow key={project.id}>
-                    <TableCell>
-                      <div className="flex items-center">
-                        <div className="h-10 w-10 flex-shrink-0 flex items-center justify-center bg-primary-100 rounded-md">
-                          <ChartGantt className="h-5 w-5 text-primary-600" />
-                        </div>
-                        <div className="ml-4">
-                          <div className="text-sm font-medium text-gray-900">{project.name}</div>
-                          <div className="text-sm text-gray-500">{project.description}</div>
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="text-sm text-gray-900">{project.dbSourceType}</div>
-                      <div className="text-sm text-gray-500">{project.dbSourceName}</div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className={getStatusBadgeStyle(project.state)}>
-                        {translateStatus(project.state)}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-sm text-gray-500">
-                      {project.lastActivity}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button 
-                        variant="link" 
-                        className="text-primary-600 hover:text-primary-900"
-                        onClick={() => handleOpenProject(project.id)}
-                      >
-                        Abrir
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+          <div className="text-center py-10 bg-gray-50 rounded-lg">
+            <p className="text-gray-500 mb-4">No hay proyectos recientes</p>
+            <Button onClick={() => navigate("/admin/proyectos")}>
+              Crear nuevo proyecto
+            </Button>
           </div>
         )}
       </CardContent>

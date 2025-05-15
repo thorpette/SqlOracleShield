@@ -1,128 +1,247 @@
 import { useState } from "react";
-import { Link, useLocation } from "wouter";
-import { Button } from "@/components/ui/button";
+import { useLocation, Link } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
-import { UserNav } from "./user-nav";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { useIsMobile } from "@/hooks/use-mobile";
 import {
-  Menu,
-  Home,
   Database,
-  Table,
-  Search,
-  EyeOff,
-  Save,
-  GitMerge,
-  LineChart,
+  BarChart2,
+  ShieldAlert,
+  HardDrive,
+  ArrowLeftRight,
   Settings,
+  PieChart,
+  FileStack,
+  Home,
   Users,
-  MenuIcon,
-  X
+  Layers3,
+  Menu,
+  X,
+  LogOut,
 } from "lucide-react";
 
-type NavItem = {
-  name: string;
-  path: string;
+interface SidebarItemProps {
+  href: string;
   icon: React.ReactNode;
-  adminOnly?: boolean;
-};
+  children: React.ReactNode;
+  isActive?: boolean;
+  onClick?: () => void;
+}
+
+function SidebarItem({
+  href,
+  icon,
+  children,
+  isActive,
+  onClick,
+}: SidebarItemProps) {
+  return (
+    <Link href={href}>
+      <Button
+        variant="ghost"
+        className={cn(
+          "w-full justify-start gap-2 pl-2",
+          isActive
+            ? "bg-gray-100 text-gray-900"
+            : "text-gray-600 hover:text-gray-900"
+        )}
+        onClick={onClick}
+      >
+        {icon}
+        <span>{children}</span>
+      </Button>
+    </Link>
+  );
+}
 
 export default function Sidebar() {
-  const [isOpen, setIsOpen] = useState(false);
   const [location] = useLocation();
-  const { user } = useAuth();
-  const isAdmin = user?.role === "admin";
-
-  const navItems: NavItem[] = [
-    { name: "Inicio", path: "/", icon: <Home className="h-5 w-5" /> },
-    { name: "Conexión", path: "/conexion", icon: <Database className="h-5 w-5" /> },
-    { name: "Esquemas", path: "/esquemas", icon: <Table className="h-5 w-5" /> },
-    { name: "Análisis", path: "/analisis", icon: <Search className="h-5 w-5" /> },
-    { name: "Ofuscación", path: "/ofuscacion", icon: <EyeOff className="h-5 w-5" /> },
-    { name: "Respaldo", path: "/respaldo", icon: <Save className="h-5 w-5" /> },
-    { name: "Migración", path: "/migracion", icon: <GitMerge className="h-5 w-5" /> },
-    { name: "Monitoreo", path: "/monitoreo", icon: <LineChart className="h-5 w-5" /> },
-    { name: "Configuración", path: "/configuracion", icon: <Settings className="h-5 w-5" /> },
-    { name: "Administración", path: "/admin", icon: <Users className="h-5 w-5" />, adminOnly: true },
-  ];
+  const { user, logout } = useAuth();
+  const isMobile = useIsMobile();
+  const [isOpen, setIsOpen] = useState(false);
 
   const toggleSidebar = () => {
     setIsOpen(!isOpen);
   };
 
-  const isActive = (path: string) => {
-    if (path === "/" && location === "/") return true;
-    if (path !== "/" && location.startsWith(path)) return true;
-    return false;
+  const closeSidebar = () => {
+    if (isMobile) {
+      setIsOpen(false);
+    }
   };
 
-  // Only display admin routes if user is admin
-  const filteredNavItems = navItems.filter(item => !item.adminOnly || isAdmin);
+  // Menú principal
+  const mainMenu = [
+    {
+      href: "/",
+      icon: <Home size={20} />,
+      label: "Inicio",
+    },
+    {
+      href: "/conexion",
+      icon: <Database size={20} />,
+      label: "Conexión",
+    },
+    {
+      href: "/esquemas",
+      icon: <FileStack size={20} />,
+      label: "Esquemas",
+    },
+    {
+      href: "/analisis",
+      icon: <BarChart2 size={20} />,
+      label: "Análisis",
+    },
+    {
+      href: "/ofuscacion",
+      icon: <ShieldAlert size={20} />,
+      label: "Ofuscación",
+    },
+    {
+      href: "/respaldo",
+      icon: <HardDrive size={20} />,
+      label: "Respaldo",
+    },
+    {
+      href: "/migracion",
+      icon: <ArrowLeftRight size={20} />,
+      label: "Migración",
+    },
+    {
+      href: "/monitoreo",
+      icon: <PieChart size={20} />,
+      label: "Monitoreo",
+    },
+    {
+      href: "/configuracion",
+      icon: <Settings size={20} />,
+      label: "Configuración",
+    },
+  ];
+
+  // Menú administrativo (solo visible para administradores)
+  const adminMenu = [
+    {
+      href: "/admin",
+      icon: <Layers3 size={20} />,
+      label: "Panel Admin",
+    },
+    {
+      href: "/admin/usuarios",
+      icon: <Users size={20} />,
+      label: "Usuarios",
+    },
+    {
+      href: "/admin/proyectos",
+      icon: <FileStack size={20} />,
+      label: "Proyectos",
+    },
+  ];
 
   return (
     <>
-      {/* Mobile menu button */}
-      <div className="md:hidden absolute top-0 left-0 p-4 z-20">
-        <Button variant="ghost" size="icon" onClick={toggleSidebar}>
-          <MenuIcon className="h-6 w-6" />
-        </Button>
-      </div>
-
-      {/* Overlay for mobile */}
-      {isOpen && (
-        <div 
-          className="md:hidden fixed inset-0 bg-black/50 z-30"
-          onClick={() => setIsOpen(false)}
-        />
-      )}
-
-      {/* Sidebar */}
-      <div 
-        className={`fixed inset-y-0 left-0 transform z-40 md:translate-x-0 transition-transform duration-300 ease-in-out ${
-          isOpen ? 'translate-x-0' : '-translate-x-full'
-        } md:relative md:flex md:flex-col md:flex-shrink-0 bg-primary-800 w-64`}
-      >
-        {/* Close button - mobile only */}
-        <div className="md:hidden absolute right-4 top-4">
-          <Button variant="ghost" size="icon" onClick={() => setIsOpen(false)} 
-            className="text-white hover:bg-primary-700">
-            <X className="h-5 w-5" />
+      {isMobile && (
+        <div className="fixed top-0 left-0 right-0 z-10 flex items-center justify-between bg-white border-b p-4">
+          <h1 className="text-xl font-bold">SQL Processor</h1>
+          <Button variant="ghost" size="icon" onClick={toggleSidebar}>
+            <Menu size={24} />
           </Button>
         </div>
+      )}
 
-        <div className="flex flex-col h-0 flex-1">
-          <div className="flex-1 flex flex-col pt-5 pb-4 overflow-y-auto">
-            <div className="flex items-center flex-shrink-0 px-4">
-              <div className="flex items-center">
-                <Database className="h-6 w-6 text-white mr-2" />
-                <span className="text-white text-lg font-semibold">SQL Migrator</span>
-              </div>
-            </div>
-            <nav className="mt-5 flex-1 px-2 space-y-1">
-              {filteredNavItems.map((item) => (
-                <Link 
-                  key={item.path} 
-                  href={item.path}
-                  onClick={() => setIsOpen(false)}
+      <div
+        className={cn(
+          "bg-white z-40 h-screen",
+          isMobile
+            ? cn(
+                "fixed top-0 left-0 w-64 shadow-lg transition-transform duration-300 transform",
+                isOpen ? "translate-x-0" : "-translate-x-full"
+              )
+            : "w-64 border-r border-gray-200"
+        )}
+      >
+        <div className="flex flex-col h-full">
+          <div className="p-4 border-b">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-bold">SQL Processor</h2>
+              {isMobile && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={toggleSidebar}
+                  className="lg:hidden"
                 >
-                  <a
-                    className={`group flex items-center px-2 py-2 text-sm font-medium rounded-md ${
-                      isActive(item.path)
-                        ? "text-white bg-primary-900"
-                        : "text-primary-100 hover:bg-primary-700"
-                    }`}
-                  >
-                    <span className="mr-3 text-primary-300">{item.icon}</span>
-                    {item.name}
-                  </a>
-                </Link>
+                  <X size={18} />
+                </Button>
+              )}
+            </div>
+            {user && (
+              <div className="mt-2 text-sm text-gray-600 truncate">
+                {user.fullName}
+              </div>
+            )}
+          </div>
+
+          <div className="flex-1 overflow-y-auto py-2">
+            <nav className="space-y-1 px-2">
+              {mainMenu.map((item) => (
+                <SidebarItem
+                  key={item.href}
+                  href={item.href}
+                  icon={item.icon}
+                  isActive={location === item.href}
+                  onClick={closeSidebar}
+                >
+                  {item.label}
+                </SidebarItem>
               ))}
             </nav>
+
+            {user?.role === "admin" && (
+              <>
+                <div className="px-4 py-2 mt-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                  Administración
+                </div>
+                <nav className="space-y-1 px-2">
+                  {adminMenu.map((item) => (
+                    <SidebarItem
+                      key={item.href}
+                      href={item.href}
+                      icon={item.icon}
+                      isActive={location === item.href}
+                      onClick={closeSidebar}
+                    >
+                      {item.label}
+                    </SidebarItem>
+                  ))}
+                </nav>
+              </>
+            )}
           </div>
-          <div className="flex-shrink-0 flex border-t border-primary-700 p-4">
-            <UserNav />
+
+          <div className="p-4 border-t">
+            <Button
+              variant="ghost"
+              className="w-full justify-start gap-2 text-red-600 hover:text-red-700 hover:bg-red-50"
+              onClick={() => {
+                logout();
+                closeSidebar();
+              }}
+            >
+              <LogOut size={20} />
+              <span>Cerrar sesión</span>
+            </Button>
           </div>
         </div>
       </div>
+
+      {isMobile && isOpen && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 z-30"
+          onClick={toggleSidebar}
+        />
+      )}
     </>
   );
 }
