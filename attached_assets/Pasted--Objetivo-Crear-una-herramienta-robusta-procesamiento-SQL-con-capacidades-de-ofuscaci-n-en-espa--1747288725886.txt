@@ -1,0 +1,267 @@
+
+Objetivo
+Crear una herramienta robusta procesamiento SQL, con capacidades de ofuscación, en español, que transforme complejas transiciones de bases de datos en una experiencia intuitiva, segura y amigable para el usuario.
+Configuracion básica
+La base de datos de la aplicación Mongodb la principal :
+Principal: {
+        "uri": "mongodb://localhost:27017/migration_tool",
+        "db_name": "principal",
+        "options": {
+            "connectTimeoutMS": 5000,
+            "socketTimeoutMS": 45000,
+            "serverSelectionTimeoutMS": 5000,
+            "retryWrites": true,
+            "maxPoolSize": 50
+        }
+Con la configuración básica de seguridad con la gestión de usuarios y proyectos 
+Donde usuario es :
+Usuario={
+‘Nombre completo’: ‘nombe de usuario’
+‘Numero empleado’: ’numero empleado’
+‘login (correo)’:’correo’ 
+‘password’:’password’
+‘nivel (admin,usuario)’;’nivel seguridad’
+)
+Y un listado de proyectos donde :
+Proyectos: {
+‘nombre’:’nombre completo’
+‘codigo’: ‘codigo’
+Usuarios:{ usuarios}
+Bbdd proyecto:’url Mongo proyecto’}
+Hay un usuario básico admnistracion ‘login (correo)’:’NTT’  y ‘password’:’NTT’ nivel:’admin’
+
+La URL admin permite la administración de usuarios y proyectos
+
+La entrada aplicación es con usuario y contraseña y si es admin acceden a administración y si es usuario accedes  al pantalla principal app  
+
+ 
+
+
+Estructura de Menú y Casos de Uso
+1. Inicio
+Descripción: Pantalla principal que muestra una introducción a la herramienta y el flujo de trabajo recomendado.
+Casos de uso:
+•	Orientación inicial para nuevos usuarios
+•	Visión general del proceso de migración
+•	Acceso rápido a los diferentes módulos mediante tarjetas informativas
+2. Conexión
+Descripción: Configuración y gestión de la conexión a la base de datos de origen.
+Casos de uso:
+•	Establecer conexión con bases de datos SQL (MySQL, PostgreSQL, SQL Server, Oracle)
+•	Guardar y cargar configuraciones de conexión
+•	Probar la conectividad antes de proceder
+•	Empezar a obtener esquema solo obtener listado de tablas y crea el esquema sin procesar.
+Proceso obtener esquema: 
+  Se muestra el listado de esquemas sin procesar o poder iniciar el proceso para obtener los campos de las tablas y los 10 registros de datos
+ 
+Estructura de datos:
+DB_CONFIG = {
+    'host': 'dirección_servidor',
+    'port': 'puerto_servidor',
+    'user': 'usuario_bd',
+    'password': 'contraseña_bd',
+    'database': 'nombre_bd',
+    'type': 'mysql|postgresql|sqlserver|oracle'
+}
+3. Esquemas
+Descripción: Extracción y visualización del esquema de la base de datos.
+Casos de uso:
+•	Visualizar tablas, columnas y relaciones de la base de datos
+•	Filtrar tablas mediante expresiones regulares
+•	Limitar el número de tablas extraídas
+•	Examinar datos de muestra
+Estructura de datos:
+esquema = {
+    'tablas': {
+        'nombre_tabla': {
+            'columnas': [
+                {
+                    'nombre': 'nombre_columna',
+                    'tipo_dato': 'tipo_SQL',
+                    'nulable': True/False,
+                    'es_clave': True/False,
+                    'longitud_max': valor_numerico
+                }
+            ],
+            'datos_muestra': [
+                {campo1: valor1, campo2: valor2, ...}
+            ]
+        }+
+    },
+    'relaciones': [
+        {
+            'tabla_origen': 'nombre_tabla_origen',
+            'columna_origen': 'nombre_columna_origen',
+            'tabla_destino': 'nombre_tabla_destino',
+            'columna_destino': 'nombre_columna_destino'
+        }
+    ]
+}
+4. Análisis
+Descripción: Análisis de sensibilidad de los datos para identificar información que requiere ofuscación.
+Casos de uso:
+•	Detección automática de posibles campos sensibles
+•	Visualización de resultados con métricas de sensibilidad
+•	Ajuste manual de campos considerados sensibles
+Estructura de datos:
+campos_sensibles = {
+    'nombre_tabla': {
+        'nombre_columna': {
+            'puntuacion': valor_numerico,  # De 0 a 100
+            'razones': ['motivo1', 'motivo2'],
+            'recomendacion': 'metodo_ofuscacion_recomendado'
+        }
+    }
+}
+5. Ofuscación
+Descripción: Configuración de métodos de ofuscación para campos sensibles.
+Casos de uso:
+•	Selección de métodos de ofuscación por columna
+•	Configuración avanzada de parámetros de ofuscación
+•	Vista previa de datos ofuscados
+Estructura de datos:
+config_ofuscacion = {
+    'nombre_tabla': {
+        'nombre_columna': {
+            'metodo': 'hash|mask|random|shuffle|none',
+            'parametros': {
+                # Parámetros específicos para cada método
+            }
+        }
+    }
+}
+Métodos de ofuscación disponibles:
+•	Hash MD5: Genera un hash irreversible del valor
+•	Enmascaramiento: Conserva caracteres iniciales y finales, reemplazando el resto con asteriscos
+•	Aleatorización: Genera valores aleatorios del mismo tipo de datos
+•	Barajado: Mezcla los caracteres del valor original
+•	Ninguno: Mantiene el valor original sin modificaciones
+6. Respaldo
+Descripción: Creación y gestión de copias de seguridad encriptadas.
+Casos de uso:
+•	Generación de respaldos encriptados de los datos originales
+•	Gestión de claves de encriptación
+•	Restauración de datos desde respaldos
+Estructura de datos:
+respaldo = {
+    'id': 'identificador_unico',
+    'fecha': 'timestamp',
+    'tablas': ['tabla1', 'tabla2', ...],
+    'total_registros': numero_registros,
+    'tamaño': tamaño_en_bytes,
+    'clave_encriptacion': 'clave_fernet_encriptada'
+}
+7. Migración
+Descripción: Configuración del proceso de migración a MongoDB.
+Casos de uso:
+•	Mapeo de estructuras SQL a colecciones MongoDB
+•	Configuración de destino de migración
+•	Definición de estrategias de migración
+Estructura de datos:
+plan_migracion = {
+    'destino': {
+        'uri': 'mongodb://usuario:contraseña@host:puerto/bd',
+        'db': 'nombre_base_datos'
+    },
+    'mapeo': {
+        'nombre_tabla_sql': {
+            'coleccion': 'nombre_coleccion_mongodb',
+            'indices': ['campo1', 'campo2'],
+            'embebidos': {
+                'tabla_relacionada': {
+                    'relacion': 'uno_a_uno|uno_a_muchos',
+                    'campos': ['campo1', 'campo2']
+                }
+            }
+        }
+    },
+    'lote': tamaño_lote
+}
+8. Monitoreo
+Descripción: Visualización en tiempo real del progreso de la migración.
+Casos de uso:
+•	Seguimiento del progreso de migración
+•	Visualización de estadísticas y métricas
+•	Detección y manejo de errores durante la migración
+Estructura de datos:
+estado_migracion = {
+    'estado': 'pendiente|en_progreso|completado|error',
+    'progreso': {
+        'total_tablas': numero_tablas,
+        'tablas_completadas': numero_tablas_procesadas,
+        're+
+ gistros_procesados': numero_registros,
+        'registros_totales': numero_total_registros,
+        'tabla_actual': 'nombre_tabla',
+        'porcentaje': valor_porcentaje,
+        'tiempo_transcurrido': tiempo_en_segundos,
+        'tiempo_estimado': tiempo_estimado_en_segundos
+    },
+    'errores': [
+        {
+            'tabla': 'nombre_tabla',
+            'mensaje': 'descripcion_error',
+            'tiempo': 'timestamp'
+        }
+    ]
+}
+9. Herramientas
+Descripción: Menú desplegable con utilidades adicionales.
+9.1 Configuración
+Descripción: Configuración global de la aplicación.
+Casos de uso:
+•	Configuración de conexión a MongoDB
+•	Ajuste de parámetros de funcionamiento
+•	Limpieza de caché
+Estructura de datos:
+configuracion = {
+    'mongodb_uri': 'mongodb://usuario:contraseña@host:puerto/bd',
+    'mongodb_nombre': 'nombre_base_datos',
+    'limite_tablas_default': numero_entero,
+    'tamano_lote_migracion': numero_entero,
+    'timeout_conexion': segundos,
+    'modo_debug': True/False
+}
+Base de Datos del Sistema
+Proyecto
+Almacena información sobre proyectos de migración.
+id: string (UUID)
+nombre: string
+descripcion: text
+fecha_creacion: datetime
+db_origen_tipo: string
+db_origen_host: string
+db_origen_puerto: string
+db_origen_nombre: string
+db_destino_uri: string
+db_destino_nombre: string
+esquema: JSON (esquema extraído)
+config_ofuscacion: JSON (configuración de ofuscación)
+clave_respaldo: string
+ruta_respaldo: string
+estado: string (creado, extracción, análisis, ofuscación, respaldo, migración, completado)
+Registro
+Almacena registros de actividad del sistema.
+id: integer (auto-incremento)
+proyecto_id: string (clave foránea a Proyecto.id)
+fecha: datetime
+tipo: string (info, warning, error)
+mensaje: text
+detalles: text
+Configuracion
+Almacena la configuración global de la aplicación.
+id: string (UUID)
+mongodb_uri: string
+mongodb_nombre: string
+fecha_actualizacion: datetime
+limite_tablas_default: integer
+tamano_lote_migracion: integer
+timeout_conexion: integer
+modo_debug: boolean
+Flujo de Trabajo Recomendado
+1.	Conexión: Configurar y probar la conexión a la base de datos SQL de origen
+2.	Esquemas: Extraer esquema y examinar la estructura de datos
+3.	Análisis: Identificar campos sensibles que requieren ofuscación
+4.	Ofuscación: Configurar métodos de ofuscación para campos sensibles
+5.	Monitoreo: Ejecutar y supervisar el proceso de migración
+Este flujo garantiza una migración segura y controlada, protegiendo datos sensibles mediante ofuscación y manteniendo respaldos encriptados para garantizar la integridad de los datos.
